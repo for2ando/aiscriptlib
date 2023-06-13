@@ -1,0 +1,112 @@
+////////
+// time.is
+// 時刻(グレゴリオ暦)変換関数
+
+@Time_milisecond(u) { u % 1000 }
+@Time_second(u) { Math:floor(u / 1000) % 60 }
+@Time_minute(u) { Math:floor(u % 3600000 / 60000) }
+@Time_hour(u) { Math:floor(u % 86400000 / 3600000) }
+@Time_serialday(u) { Math:floor(u / 86400000) }  // グレゴリオ暦1970年1月1日を0とする通算日
+@Time_fourcentury(u) { 5 + Math:floor((Time_serialday(u) - 10957) / 146097) }  // 紀元後1〜4世紀を0、5〜8世紀を1とする四世紀通番
+@Time_fourcenturyday(u) { mod((Time_serialday(u) - 11323) 146097) }  // 四世紀内の最初の日((integer*400+1)年1月1日)を0とする四世紀内通算日
+// 11323=365*23+366*8 : グレゴリオ暦で1970年1月1日から2000年12月31日までの日数(両端の日を含む)
+// 146097=365*303+366*97 : グレゴリオ暦で四世紀間の日数
+@Time_century(u) { 1 + Time_fourcentury(u) * 4 + Math:floor(Time_fourcenturyday(u) / 36524) } // 世紀(紀元1年〜紀元100年が第1世紀)
+@Time_centuryday(u) { mod(Time_fourcenturyday(u) 36524) }  // 世紀内の最初の日(integer*100+1)年1月1日を0とする通算日
+// 36524=365*76+366*24 : グレゴリオ暦で一世紀(100年)間の日数(但し西暦年が400で割り切れる年の2月29日を含まない100年間の)
+@Time_fouryear(u) { (Time_century(u) - 1) * 25 + Math:floor(Time_centuryday(u) / 1461) }  // 紀元1〜4年を0とする4年期の通番
+@Time_fouryearday(u) { mod(Time_centuryday(u) 1461) }  // 4年期内の通算日
+// 1461=365*3+366 : グレゴリオ暦で4年間の日数(当然に閏日を含む)
+@Time_year(u) { 1 + Time_fouryear(u) * 4 + Math:floor(Time_fouryearday(u) / 365) }  // 西暦年
+@Time_yearday(u) { mod(Time_fouryearday(u) 365) }  //1月1日を0とする年内の通算日
+// 365 : グレゴリオ暦でうるう年でない1年の日数(但し世紀の最後の年の2月29日を含まない期間の)
+@Time_month(u) {  // 0=1月, ..., 11=12月
+  let dayinmonth = [31 28 31 30 31 30 31 31 30 31 30 31]
+  let yday = Time_yearday(u)
+  for let mon 11 {
+    var dim = dayinmonth[mon]
+    if (yday <= dim) {
+      return mon
+    }
+    yday -= dim
+  }
+  return 13
+}
+@Time_monthday(u) {  // 1=毎月1日
+  let dayinmonth = [31 28 31 30 31 30 31 31 30 31 30 31]
+  let yday = Time_yearday(u) + 1
+  for let mon 11 {
+    var dim = dayinmonth[mon]
+    if (yday <= dim) {
+      return yday
+    }
+    yday -= dim
+  }
+  return yday
+}
+@Time_weekday(u) {  // 0=日, 1=月, …, 6=土
+  mod((Time_serialday(u) + 4) 7)
+}
+@localtime(u: num, minuteswest: num): obj {
+  let ut = u - minuteswest * 3600000
+  {
+    msec: Time_milisecond(ut)
+    sec: Time_second(ut)
+    min: Time_minute(ut)
+    hour: Time_hour(ut)
+    mday: Time_monthday(ut)
+    mon: Time_month(ut)
+    year: Time_year(ut)
+    wday: Time_weekday(ut)
+    yday: Time_yearday(ut)
+    is_dst: 0
+  }
+}
+@gmtime(u: num): obj {
+  localtime(u 0)
+}
+
+// 年月日時分秒→UNIX時刻変換関数
+@Time_dayinyear(y: num) {  // 西暦年yの含む日数
+  if (y % 4 == 0) {
+    if (y % 100 == 0) {
+      if (y % 400 == 0) {
+        366
+      } else {
+        365
+      }
+    } else {
+      366
+    }
+  } else {
+    365
+  }
+}
+@mktime(tm: obj): num {
+  if (Obj:has(tm "year") == false) tm.year = Date:year()
+  if (Obj:has(tm "mon") == false) tm.mon = Date:month()
+  if (Obj:has(tm "mday") == false) tm.mday = Date:day()
+  if (Obj:has(tm "hour") == false) tm.hour = Date:hour()
+  if (Obj:has(tm "min") == false) tm.min = Date:minute()
+  if (Obj:has(tm "sec") == false) tm.sec = Date:second()
+  if (Obj:has(tm "msec") == false) tm.msec = Date:now() % 1000
+  let dayinmonth = [31 28 31 30 31 30 31 31 30 31 30 31]
+  var totalday = 0
+  if (tm.year >= 1970) {
+    for let y=1970 (tm.year - 1970) {
+      totalday += Time_dayinyear(y)
+    }
+  } else {  // tm.year < 1970
+    for let y=tm.year (1970 - tm.year) {
+      totalday -= Time_dayinyear(y)
+    }
+  }
+  for let m tm.mon {
+    totalday += dayinmonth[m]
+  }
+  ((((totalday + tm.mday - 1) * 24 + tm.hour) * 60 + tm.min) * 60 + tm.sec) * 1000 + tm.msec
+}
+
+@asctime2(tm: obj): str {
+  return `{tm.year}-{tm.mon+1}-{tm.mday} {tm.hour}:{tm.min}:{tm.sec}`
+}
