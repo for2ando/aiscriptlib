@@ -1,0 +1,30 @@
+////////
+// utility.is
+// ユーティリティ関数
+
+// nの符号によらず、0<=mod(n)<dの正の整数である剰余を返す
+@mod(n d) { n - Math:floor(n / d) * d }
+
+// MFMを処理しないダイアログ表示関数
+@Mk_dialog(title: str text:str type:str): void {
+	let titlemfm = if (title == "") { "" } else { `<plain>{title}</plain>` }
+	let textmfm = if (text == "") { "" } else { `<plain>{text}</plain>` }
+	Mk:dialog(titlemfm textmfm type)
+}
+
+@Mk_confirm(title: str text:str type:str): bool {
+	let titlemfm = if (title == "") { "" } else { `<plain>{title}</plain>` }
+	let textmfm = if (text == "") { "" } else { `<plain>{text}</plain>` }
+	Mk:confirm(titlemfm textmfm type)
+}
+
+// デバッグ用ブレークポイント
+@brkpt(title: str text: str): void {
+	if (Mk_confirm(title text)) return null
+	exit()
+}
+
+// スクリプトを終了する
+@exit(): void {
+	undefinedvariable	// must be an undefined variable (so exit by exception)
+}
